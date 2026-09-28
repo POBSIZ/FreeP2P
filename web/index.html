@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FreeP2P · Minecraft LAN</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header class="topbar"><a class="brand" href="/" aria-label="FreeP2P 홈"><span class="brandmark">F<span>↗</span></span>FreeP2P<span class="edition">MINECRAFT JAVA</span></a><div class="local-pill"><i></i> 이 PC에서만 열리는 제어 화면</div></header>
+<div class="app-controls"><button class="text-button" id="quit-app">앱 종료</button></div>
+<dialog id="quit-dialog"><h2>FreeP2P를 종료할까요?</h2><p>모든 P2P 연결이 끊어지고 프로그램이 완전히 종료됩니다.<br>브라우저 탭만 닫으면 연결은 계속 유지됩니다.</p><div class="dialog-actions"><button class="subtle" id="cancel-quit">취소</button><button class="primary danger-fill" id="confirm-quit">앱 종료</button></div></dialog>
+<main>
+  <section id="locked" class="notice" hidden><h2>실행 링크로 열어 주세요</h2><p>터미널에 표시된 전체 주소로 접속하면 이 PC의 터널을 조작할 수 있습니다. 이 페이지 주소는 친구에게 공유하지 마세요.</p></section>
+  <section id="setup">
+    <div class="intro"><div><div class="eyebrow">같은 방에 있지 않아도</div><h1>내 월드에,<br><em>친구를 초대하세요.</em></h1><p class="lede">LAN 서버는 그대로. 연결 코드만 서로 교환하고<br class="desktop"> 마인크래프트에서 함께 플레이하세요.</p><div class="feature-row"><span>↗ 직접 연결</span><span>◇ 암호화 전송</span><span>◎ 여러 친구와 함께</span></div></div><div class="voxel-scene" aria-hidden="true"><div class="orbit"></div><div class="voxel one"></div><div class="voxel two"></div><div class="voxel three"></div><div class="voxel four"></div><span class="scene-label">YOUR WORLD. YOUR CONNECTION.</span></div></div>
+    <section class="setup-card"><div class="section-heading"><div><span class="eyebrow">01 / 시작하기</span><h2>어떻게 플레이할까요?</h2></div><span class="tag">별도 계정 필요 없음</span></div>
+      <div class="role-options"><button id="choose-host" class="role selected" aria-pressed="true"><span class="role-icon">⌂</span><span><strong>내 월드 열기</strong><small>LAN 서버를 열고 친구들을 초대해요.</small></span><span class="radio-dot"></span></button><button id="choose-guest" class="role" aria-pressed="false"><span class="role-icon">↗</span><span><strong>친구 월드 참가</strong><small>호스트에게 받은 코드로 연결해요.</small></span><span class="radio-dot"></span></button></div>
+      <form id="start-form"><div class="form-grid"><label>표시 이름<input id="name" maxlength="40" required value="나의 월드" placeholder="친구들에게 표시할 이름" autocomplete="off"></label><label id="port-label"><span id="port-title">게임에서 표시된 LAN 포트</span><input id="port" type="number" min="1" max="65535" required value="25565"><small id="port-help">게임에서 Esc → LAN 서버 열기 후 표시되는 숫자예요.</small></label></div><label id="max-peers-field" class="limit-field">최대 참가자 수<input id="max-peers" type="number" min="1" step="1" required value="16"><small>호스트를 제외한 등록 가능 인원입니다. 시작 후에도 변경할 수 있어요.</small></label><label id="host-code-field" hidden>호스트 연결 코드<textarea id="host-code" rows="3" placeholder="호스트가 보내 준 fpm1: 코드를 붙여넣으세요." spellcheck="false"></textarea></label><div class="form-bottom"><p id="start-hint">먼저 마인크래프트에서 월드를 열어 주세요.</p><button class="primary" id="start-button" type="submit">호스트 시작 <span>→</span></button></div><p id="start-error" class="error" role="alert" hidden></p></form>
+    </section>
+    <div class="footnotes"><p><b>중계 서버 없이 연결합니다.</b> 일부 NAT·방화벽 환경에서는 연결되지 않을 수 있어요.</p><p>Java Edition 전용 · 게임 버전과 모드 구성을 서로 맞춰 주세요.</p></div>
+  </section>
+
+  <section id="workspace" hidden>
+    <div class="workspace-heading"><div><span class="eyebrow" id="mode-label">HOST SESSION</span><h1 id="world-name">나의 월드</h1><p id="session-description">친구의 참가 코드를 등록하면 연결을 시작합니다.</p></div><button class="subtle danger" id="stop-button">세션 종료</button></div>
+    <div class="stats"><article><span>연결 상태</span><strong id="node-state">주소 확인 중</strong><small id="node-state-help">잠시만 기다려 주세요.</small></article><article><span id="count-title">연결된 참가자</span><strong id="peer-count">0 <small>/ 16</small></strong><small>연결된 게임 클라이언트는 별도로 표시됩니다.</small></article><article><span id="endpoint-title">내 LAN 서버</span><strong class="mono" id="game-address">127.0.0.1:25565</strong><button class="text-button" id="check-game">LAN 포트 확인 ↗</button><button class="text-button" id="copy-address" hidden>게임 접속 주소 복사 ↗</button></article></div>
+    <div class="workspace-grid"><div class="main-column">
+      <article class="panel code-panel"><div class="section-heading"><div><span class="eyebrow">01 / 코드 공유</span><h2 id="code-title">호스트 연결 코드</h2></div><button class="subtle" id="copy-code" disabled>코드 복사</button></div><p id="code-help">이 코드를 친구에게 보내 주세요. 친구가 보내 주는 참가 코드도 필요합니다.</p><textarea id="own-code" readonly spellcheck="false" rows="3" aria-label="내 연결 코드" placeholder="외부 주소를 확인하고 있습니다…"></textarea><div class="quiet-note">◇ 코드는 연결 권한을 포함합니다. 함께 플레이할 사람에게만 공유하세요.</div></article>
+      <article class="panel" id="add-panel"><div class="section-heading"><div><span class="eyebrow">02 / 친구 연결</span><h2>참가 코드 등록</h2></div><span class="tag" id="max-peers-tag">최대 16명</span></div><form id="limit-form" class="limit-form"><label for="live-max-peers">최대 참가자 수<input id="live-max-peers" type="number" min="1" step="1" required value="16"></label><button class="subtle" type="submit" id="save-limit">적용</button><p class="muted">현재 등록된 참가자보다 작게 설정할 수 없습니다.</p><p id="limit-error" class="error" role="alert" hidden></p></form><form id="add-form"><label class="sr-only" for="guest-code">참가 코드</label><textarea id="guest-code" rows="2" required placeholder="친구가 보내 준 참가 코드를 붙여넣으세요." spellcheck="false"></textarea><div class="form-bottom"><span class="muted">등록 후 양쪽에서 자동으로 연결을 시도합니다.</span><button class="primary" id="add-button" type="submit">참가자 추가 +</button></div><p id="add-error" class="error" role="alert" hidden></p></form></article>
+      <article class="panel"><div class="section-heading"><div><span class="eyebrow">LIVE CONNECTIONS</span><h2 id="peers-title">참가자</h2></div><span class="live-label"><i></i> 실시간</span></div><div id="peers"></div></article>
+    </div><aside>
+      <article class="panel guide"><span class="eyebrow">PLAY TOGETHER</span><h2 id="guide-title">초대는 세 단계로.</h2><ol id="guide-steps"><li><b>호스트 코드를 공유해요</b><span>친구도 FreeP2P를 실행해 주세요.</span></li><li><b>친구의 참가 코드를 등록해요</b><span>양쪽 코드를 교환해야 연결됩니다.</span></li><li><b>게임에서 직접 연결해요</b><span>친구 화면에 표시된 로컬 주소로 접속해요.</span></li></ol><div class="guide-tip">LAN 목록에 자동으로 나타나지 않아요.<br><b>멀티플레이 → 직접 연결</b>을 사용하세요.</div></article>
+      <article class="panel activity"><div class="section-heading"><h2>최근 활동</h2><span class="tag">LOCAL</span></div><ol id="events"></ol></article>
+      <details class="panel technical"><summary>연결 정보</summary><dl><dt>외부 주소 후보</dt><dd id="public-address">확인 중</dd><dt>사용 중인 UDP 포트</dt><dd id="udp-port">—</dd><dt>전송 방식</dt><dd>직접 UDP · 암호화된 QUIC 스트림</dd></dl></details>
+    </aside></div>
+  </section>
+</main>
+<footer><span>FreeP2P <span class="muted">/</span> Minecraft LAN</span><span>연결은 직접. 플레이는 함께.</span></footer>
+<div id="toast" role="status" hidden></div>
+<dialog id="stop-dialog"><h2>세션을 종료할까요?</h2><p>이 도구를 통해 접속한 게임 연결이 끊깁니다.<br>마인크래프트의 월드는 종료되지 않습니다.</p><div class="dialog-actions"><button class="subtle" id="cancel-stop">계속 플레이</button><button class="primary danger-fill" id="confirm-stop">세션 종료</button></div></dialog>
+</body></html>
