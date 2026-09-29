@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import select
 import socket
 import struct
 import time
@@ -130,6 +131,9 @@ class PeerTests(unittest.TestCase):
             with_peer.tick()
             data, address = server.recvfrom(4096)
             server.sendto(response(data[8:20], *address), address)
+            # sendto returning does not mean the receiving socket is ready yet.
+            readable, _, _ = select.select([with_peer.sock], [], [], 2)
+            self.assertTrue(readable, 'Timed out waiting for the fake STUN response')
             with_peer.tick()
             self.assertEqual(with_peer.public, address)
             self.assertEqual(with_peer.state, 'WAITING')
