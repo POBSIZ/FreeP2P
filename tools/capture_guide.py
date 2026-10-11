@@ -41,7 +41,8 @@ async def main():
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch()
-            page = await browser.new_page(viewport={'width':1280,'height':1000}, device_scale_factor=1)
+            page = await browser.new_page(viewport={'width':1280,'height':1000}, device_scale_factor=1,
+                                          permissions=['clipboard-read', 'clipboard-write'])
             await page.route('**/api/**', fake_api)
             await page.goto(base + '/#documentation-demo')
             await page.locator('#start-button').wait_for()
@@ -52,6 +53,10 @@ async def main():
             await page.locator('#choose-guest').click()
             await page.locator('#host-code').fill('fpm1:호스트가_보낸_전체_코드 (연결 불가 예시)')
             await page.locator('#setup .setup-card').screenshot(path=str(OUT/'guest-setup.png'))
+            await page.locator('#guest-options summary').click()
+            await page.locator('#listen-port').fill('25566')
+            await page.locator('#guest-options').screenshot(path=str(OUT/'guest-options.png'))
+            await page.locator('#guest-options summary').click()
             node = {'role':'host','name':'친구들과 생존 월드','status':'ready',
                     'code':'fpm1:가이드용_예시입니다_실제_연결_불가',
                     'public':'192.0.2.10:40000','udp_port':40000,'game_port':51234,
@@ -60,18 +65,31 @@ async def main():
             state['node'] = node
             await expect(page.locator('#workspace')).to_be_visible()
             await page.locator('.code-panel').screenshot(path=str(OUT/'share-code.png'))
+            await page.locator('#copy-code').click()
+            await expect(page.locator('#next-title')).to_have_text('친구가 보내 준 코드를 등록하세요')
+            await page.locator('.next-step').screenshot(path=str(OUT/'next-step.png'))
             await page.locator('#guest-code').fill('fpm1:친구가_돌려준_전체_코드 (연결 불가 예시)')
-            await page.locator('#live-max-peers').fill('32')
             await page.locator('#add-panel').screenshot(path=str(OUT/'register-peer.png'))
+            await page.locator('#live-options summary').click()
+            await page.locator('#live-max-peers').fill('32')
+            await page.locator('#add-panel').screenshot(path=str(OUT/'participant-limit.png'))
             await page.locator('#live-max-peers').fill('16')
+            await page.locator('#live-options summary').click()
             await page.locator('#guest-code').fill('')
+            await page.locator('#check-game').click()
+            await expect(page.locator('#game-check-result')).to_contain_text('입력한 번호에서 응답이 왔습니다.')
+            await page.locator('.stats').screenshot(path=str(OUT/'game-check.png'))
+            await page.locator('#game-check-result').evaluate('el => el.hidden = true')
             node['peers'] = [{'id':'demo','name':'친구 (예시)','state':'connected','error':'','rtt':30,'streams':1,'uploaded':1048576,'downloaded':1048576}]
             await expect(page.locator('.badge.connected')).to_be_visible()
             await page.screenshot(path=str(OUT/'overview.png'), full_page=True)
             node['role'] = 'guest'
             node['name'] = '참가자 (예시)'
-            await expect(page.locator('#count-title')).to_have_text('호스트 연결')
+            node['peers'][0].update(state='punching', streams=0, uploaded=0, downloaded=0, rtt=None)
+            await expect(page.locator('#count-title')).to_have_text('친구와의 연결')
             await page.locator('.code-panel').screenshot(path=str(OUT/'guest-code.png'))
+            node['peers'][0].update(state='connected', rtt=30)
+            await expect(page.locator('#peer-count')).to_have_text('연결됨')
             await page.locator('.stats').screenshot(path=str(OUT/'guest-connected.png'))
             await page.locator('#quit-app').click()
             await page.locator('#quit-dialog').screenshot(path=str(OUT/'quit.png'))

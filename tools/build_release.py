@@ -15,7 +15,7 @@ release = ROOT / 'release'
 release.mkdir(exist_ok=True)
 machine = platform.machine().lower()
 arch = {'amd64': 'x64', 'x86_64': 'x64', 'aarch64': 'arm64'}.get(machine, machine)
-name = f'FreeP2P-0.1.0-{platform.system().lower()}-{arch}'
+name = f'FreeP2P-0.2.0-{platform.system().lower()}-{arch}'
 archive = release / (name + '.zip')
 if sys.platform == 'darwin':
     subprocess.run(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent',

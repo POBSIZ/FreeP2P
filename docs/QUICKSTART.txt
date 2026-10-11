@@ -9,12 +9,14 @@ Windows의 _internal 폴더는 지우지 마세요.
 1. 게임에서 Esc → LAN 서버 열기. 표시된 숫자를 확인합니다.
 2. FreeP2P의 내 월드 열기 → LAN 포트에 그 숫자 입력 → 호스트 시작.
 3. 코드 복사를 눌러 친구에게 보내고, 친구가 돌려준 코드도 등록합니다.
+화면 위 '지금 할 일'에서 다음에 무엇을 할지 확인할 수 있습니다.
 
 들어갈 친구:
 1. 친구 월드 참가 → 받은 코드 붙여넣기 → 참가 준비.
 2. 내 참가 코드를 복사해 월드를 연 친구에게 보냅니다.
 3. 연결됨이 나오면 게임 접속 주소 복사를 누릅니다.
 4. Minecraft 멀티플레이 → 직접 연결 → 복사한 주소 붙여넣기.
+접속 설정은 보통 바꾸지 않아도 됩니다.
 
 사진과 함께 따라 하기:
 https://github.com/POBSIZ/FreeP2P/blob/main/docs/USER_GUIDE.md
@@ -22,5 +24,6 @@ https://github.com/POBSIZ/FreeP2P/blob/main/docs/USER_GUIDE.md
 https://github.com/POBSIZ/FreeP2P/blob/main/docs/SECURITY_WARNINGS.md
 
 다 놀았으면 웹 화면의 앱 종료를 누르세요. 탭만 닫으면 계속 켜져 있습니다.
+다른 월드로 바꾸려면 연결 끝내기를 누르고 처음부터 준비하세요.
 코드는 함께할 친구에게만 보내 주세요.
 인터넷 환경에 따라 연결되지 않을 수 있습니다. 아직 시험 배포 중이며 실제 게임 입장 검증은 남아 있습니다.

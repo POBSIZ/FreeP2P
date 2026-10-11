@@ -18,6 +18,6 @@ exe = EXE(
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='FreeP2P')
 if sys.platform == 'darwin':
     app = BUNDLE(coll, name='FreeP2P.app', icon='assets/icon.icns', bundle_identifier='io.freep2p.minecraft',
-                 info_plist={'CFBundleShortVersionString': '0.1.0',
+                 info_plist={'CFBundleShortVersionString': '0.2.0',
                              'NSHighResolutionCapable': True,
                              'LSUIElement': True})

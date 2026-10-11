@@ -12,8 +12,8 @@ Python 등 별도 프로그램을 설치할 필요는 없습니다.
 
 | 사용하는 컴퓨터 | 받을 파일 | 받은 뒤 할 일 |
 | --- | --- | --- |
-| Windows PC (x64) | [Windows용 받기](https://github.com/POBSIZ/FreeP2P/releases/download/v0.1.0/FreeP2P-0.1.0-windows-x64.zip) | 모두 압축 풀기 → FreeP2P 폴더 → FreeP2P.exe 실행 |
-| Mac M 시리즈 | [Mac용 받기](https://github.com/POBSIZ/FreeP2P/releases/download/v0.1.0/FreeP2P-0.1.0-darwin-arm64.zip) | 압축 파일 두 번 클릭 → FreeP2P 앱 실행 |
+| Windows PC (x64) | [Windows용 받기](https://github.com/POBSIZ/FreeP2P/releases/download/v0.2.0/FreeP2P-0.2.0-windows-x64.zip) | 모두 압축 풀기 → FreeP2P 폴더 → FreeP2P.exe 실행 |
+| Mac M 시리즈 | [Mac용 받기](https://github.com/POBSIZ/FreeP2P/releases/download/v0.2.0/FreeP2P-0.2.0-darwin-arm64.zip) | 압축 파일 두 번 클릭 → FreeP2P 앱 실행 |
 
 Windows는 실행 파일 옆 `_internal` 폴더도 필요합니다. Intel Mac용과 Windows ARM 전용 버전은 아직 없습니다.
 

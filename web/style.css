@@ -2,3 +2,98 @@
 
 .limit-field{margin-top:18px;max-width:430px}.limit-field input{max-width:160px}.limit-form{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:0 0 22px;margin-bottom:22px;border-bottom:1px solid var(--line)}.limit-form label{width:150px}.limit-form .muted,.limit-form .error{flex-basis:100%;margin:0}.limit-form button{margin-bottom:2px}
 :root .app-controls{max-width:1180px;margin:8px auto 0;padding:0 24px;display:flex;justify-content:flex-end}
+
+/* Keep the next action and the game address readable at every screen size. */
+.skip-link{position:absolute;left:16px;top:-100px;z-index:10;background:var(--accent);color:var(--ink);padding:12px 20px;border-radius:8px}
+.skip-link:focus{top:12px}
+.topbar{gap:20px}
+.topbar .local-pill{margin-left:auto}
+.intro{padding:30px 0 26px;min-height:260px;grid-template-columns:1.5fr 1fr}
+.intro h1{font-size:40px;margin:12px 0}
+.intro .lede{margin-bottom:0;line-height:1.7}
+.voxel-scene{height:240px}
+.voxel.one{width:90px;height:90px;top:28px}
+.voxel.two{top:120px;width:64px;height:64px}
+.voxel.three{top:160px}
+.setup-card{padding:28px 32px}
+.role strong{font-size:17px}
+.role small,label{font-size:14px}
+label small,.form-bottom p,.panel p,.muted{font-size:13px;line-height:1.7}
+label small{color:#aebeb2}
+.form-tip{background:#223021;border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0;font-size:14px;color:#d3e6cc;margin:0 0 24px}
+input,textarea{font-size:15px;min-height:46px}
+textarea{font-size:13px}
+input[aria-invalid=true],textarea[aria-invalid=true]{border-color:var(--red)}
+.options{border-top:1px solid var(--line);margin-top:22px;padding-top:16px}
+summary{cursor:pointer;min-height:44px;line-height:1.7;padding:10px 0;font-weight:600;font-size:14px;color:#cfddcf}
+.options summary span{font-weight:400;font-size:12px;color:var(--muted);margin-left:10px}
+.options .limit-field{margin-top:12px;max-width:none}
+.options .limit-form{margin:16px 0 0;padding:0;border:0}
+.options .limit-form .muted{font-size:12px}
+.footnotes{font-size:12px;flex-wrap:wrap;gap:0 20px}
+.text-button{min-height:44px;padding:10px 4px;font-size:13px;text-align:left}
+.subtle,.primary{min-height:44px;font-size:14px}
+button:disabled{cursor:not-allowed}
+button[aria-busy=true]{cursor:wait}
+.workspace-heading{padding-top:30px;gap:18px}
+.workspace-heading h1{overflow-wrap:anywhere}
+.workspace-heading>div{min-width:0}
+.next-step{display:flex;justify-content:space-between;align-items:center;gap:24px;background:#233320;border:1px solid #5c7849;border-radius:14px;padding:24px 28px;margin-bottom:20px}
+.next-step h2{font-size:23px;margin:6px 0}
+.next-step p{margin:0;color:#c3d5bc;font-size:14px;line-height:1.8}
+.next-step .primary{flex-shrink:0}
+.next-copy{min-width:0}
+.stats{grid-template-columns:1fr .85fr 1.35fr}
+.stats article{min-width:0;padding:20px}
+.stats strong{font-size:20px;overflow-wrap:anywhere;line-height:1.5}
+.stats article>small{display:block;color:#acbdae;font-size:12px;line-height:1.7}
+.stats .address{display:block;padding:4px 0;margin:7px 0;min-height:38px;border:none;border-radius:0;background:transparent;color:var(--accent);font-size:20px;font-weight:650;width:100%}
+.stats label{font-weight:400;color:var(--muted);font-size:12px}
+#game-check-result{font-size:12px;line-height:1.7;margin:8px 0 0;color:#c4debb}
+.copy-feedback{color:var(--accent)!important;background:#263823;padding:10px 12px;border-radius:6px}
+.quiet-note{font-size:12px;color:#a7b7aa}
+.code-panel textarea{min-height:84px}
+#add-form textarea{margin-top:8px}
+.guide b,.guide-tip,.guide li span{font-size:13px}
+.guide li{padding-left:28px;margin-bottom:18px}
+.guide ol{margin:18px 0}
+.help ol{padding-left:20px;color:var(--muted);font-size:13px}
+.help li{margin:10px 0}
+.panel.activity,.panel.help,.panel.technical{padding-top:10px;padding-bottom:10px}
+.activity ol{margin-top:10px}
+.activity li{font-size:12px}
+.activity time{font-size:11px;color:#9cae9e}
+.technical dl{margin:0 0 12px}
+.technical{font-size:12px}
+.technical dt{color:#a1b4a7}
+.peer-top{flex-wrap:wrap}
+.peer-name{flex:1;min-width:0}
+.peer-meta{font-size:12px;margin-left:0}
+.peer-help{color:#e1c7a8!important}
+.peer-actions{margin-left:0;gap:20px}
+.peer-detail summary{font-size:12px;color:var(--muted);font-weight:400}
+.peer-error{overflow-wrap:anywhere}
+.empty{font-size:14px;line-height:1.8;padding:16px 0}
+.badge{font-size:12px;padding:4px 10px}
+.connection-notice{max-width:1152px;margin:20px auto 0;padding:20px}
+[inert]{opacity:.55}
+dialog{width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 40px);overflow:auto;margin:auto;padding:26px}
+dialog p{font-size:14px;line-height:1.8}
+.dialog-actions{flex-wrap:wrap}
+footer{font-size:12px;gap:20px}
+@media(max-width:1240px){.connection-notice{margin-left:36px;margin-right:36px}}
+@media(max-width:900px){.stats{grid-template-columns:1fr 1fr}.stats article:last-child{grid-column:1 / -1}.workspace-grid{grid-template-columns:1fr}.next-step{align-items:flex-start;flex-direction:column;gap:16px}}
+@media(max-width:800px){
+  .intro{padding:28px 0 22px;min-height:0;display:block}.intro h1{font-size:32px}.lede{font-size:14px}
+  .topbar{gap:12px}.edition{display:none}.topbar #quit-app{margin-left:auto}
+  .setup-card,.panel{padding:20px}.section-heading{align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+  .next-step{padding:20px}.next-step h2{font-size:21px}.next-step .primary{width:100%;white-space:normal}
+  .workspace-heading{align-items:flex-start}.workspace-heading h1{font-size:26px}.workspace-heading p{font-size:13px}
+  .stats{grid-template-columns:1fr}.stats article:last-child{grid-column:auto}.stats article{padding:18px 20px}
+  .stats .address{font-size:22px}.form-tip{font-size:13px}.role{padding:14px}.role small{font-size:13px}
+  .options summary span{display:block;margin-left:18px}.guide-tip{font-size:13px}.badge{font-size:11px}
+  .connection-notice{margin:16px 20px 0}.peer-top{gap:8px}.peer-actions{gap:14px}
+  input,textarea{font-size:16px}#own-code{font-size:13px}.dialog-actions>button{flex:1}.dialog-actions{gap:8px}
+  .footnotes{padding-bottom:0}footer{flex-direction:column;gap:4px}.text-button{font-size:13px}
+}
+@media(prefers-reduced-motion:reduce){button{transition:none}}
