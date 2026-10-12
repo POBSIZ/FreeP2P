@@ -27,8 +27,10 @@ from aioquic.quic.connection import QuicConnection
 from aioquic.quic.events import ConnectionTerminated, HandshakeCompleted, StreamReset
 from aioquic.quic.packet import pull_quic_header, QuicPacketType
 from cryptography import x509
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.x509.oid import NameOID
 
 from freep2p import COOKIE, DEFAULT_STUN, parse_stun
@@ -39,6 +41,7 @@ WINDOW = 16
 DEFAULT_MAX_PEERS = 16
 MAX_STREAMS = 16
 CODE_HEADER = struct.Struct('!B4sH')
+CODE_ENDPOINT = struct.Struct('!4sH')
 MAX_COMPACT_BYTES = CODE_HEADER.size + 32 + 32 + 160 + 4
 
 
@@ -65,11 +68,18 @@ def validate_code_fields(obj):
     obj['name'].encode('utf-8')
 
 
-def encode_code(obj):
-    """Pack endpoint, full-strength token, certificate pin and UTF-8 display name."""
+def encode_code(obj, version=3):
+    """Keep authentication material intact; v3 transfers names after code exchange."""
     validate_code_fields(obj)
-    payload = CODE_HEADER.pack(0 if obj['role'] == 'host' else 1,
-                               ipaddress.IPv4Address(obj['ip']).packed, obj['port'])
+    address = ipaddress.IPv4Address(obj['ip']).packed
+    if version == 3:
+        prefix = 'f3h:' if obj['role'] == 'host' else 'f3g:'
+        payload = CODE_ENDPOINT.pack(address, obj['port'])
+    elif version == 2:
+        prefix = 'fpm2:'
+        payload = CODE_HEADER.pack(0 if obj['role'] == 'host' else 1, address, obj['port'])
+    else:
+        raise ValueError('지원하지 않는 연결 코드 형식입니다.')
     payload += unb64(obj['token'])
     if obj['role'] == 'host':
         fingerprint = (hashlib.sha256(unb64(obj['cert'])).digest() if 'cert' in obj
@@ -77,17 +87,35 @@ def encode_code(obj):
         if len(fingerprint) != 32:
             raise ValueError('인증서 지문이 올바르지 않습니다.')
         payload += fingerprint
-    payload += obj['name'].encode('utf-8')
+    if version == 2:
+        payload += obj['name'].encode('utf-8')
     # Typo detection only; peer authentication still uses HMAC and pinned TLS.
-    payload += struct.pack('!I', binascii.crc32(payload))
-    return 'fpm2:' + b64(payload)
+    checked = prefix.encode('ascii') + payload if version == 3 else payload
+    payload += struct.pack('!I', binascii.crc32(checked))
+    return prefix + b64(payload)
 
 
 def decode_code(code):
     try:
         if not isinstance(code, str) or len(code) > 4096:
             raise ValueError()
-        if code.startswith('fpm2:'):
+        if code.startswith(('f3h:', 'f3g:')):
+            prefix = code[:4]
+            host = prefix == 'f3h:'
+            raw = unb64(code[4:])
+            if len(raw) != (74 if host else 42):
+                raise ValueError()
+            payload, checksum = raw[:-4], raw[-4:]
+            if checksum != struct.pack('!I', binascii.crc32(prefix.encode('ascii') + payload)):
+                raise ValueError()
+            address, port = CODE_ENDPOINT.unpack_from(payload)
+            pos = CODE_ENDPOINT.size + 32
+            obj = {'role': 'host' if host else 'guest', 'ip': str(ipaddress.IPv4Address(address)),
+                   'port': port, 'token': b64(payload[CODE_ENDPOINT.size:pos]), 'version': 3,
+                   'name': '호스트' if host else '참가자'}
+            if host:
+                obj['cert_sha256'] = b64(payload[pos:pos + 32])
+        elif code.startswith('fpm2:'):
             raw = unb64(code[5:])
             if not 44 <= len(raw) <= MAX_COMPACT_BYTES:
                 raise ValueError()
@@ -155,6 +183,7 @@ class Session:
     highest: int = 0
     seen: set = field(default_factory=set)
     challenges: dict = field(default_factory=dict)
+    name_challenges: dict = field(default_factory=dict)
     started: float = field(default_factory=time.monotonic)
     next_probe: float = 0
     last_rx: float = field(default_factory=time.monotonic)
@@ -177,6 +206,12 @@ class Session:
         header = MAGIC + self.sid + kind + self.tx.to_bytes(8, 'big') + payload
         wire = header + hmac.digest(self.key, header, 'sha256')
         self.node.transport.sendto(wire, self.addr)
+
+    def send_name(self, challenge):
+        key = hmac.digest(self.key, b'freep2p-name-v3/' + self.node.role.encode('ascii'), 'sha256')
+        nonce = secrets.token_bytes(12)
+        encrypted = AESGCM(key).encrypt(nonce, self.node.name.encode('utf-8'), b'FQN3' + self.sid + challenge)
+        self.send(b'N', challenge + nonce + encrypted)
 
     def stop(self, reason='연결 종료'):
         self.state = 'closed'
@@ -411,6 +446,8 @@ class TunnelNode(asyncio.DatagramProtocol):
         sid = hashlib.sha256(key).digest()[:16]
         if sid in self.sessions:
             raise ValueError('이미 등록된 상대입니다.')
+        if other['version'] == 3:
+            other['name'] += ' · ' + sid.hex()[:4]
         session = Session(self, other, sid, key, (other['ip'], other['port']))
         if self.role == 'guest' and other['version'] == 1:
             session.peer_certificate = unb64(other['cert'])
@@ -430,6 +467,7 @@ class TunnelNode(asyncio.DatagramProtocol):
         session.state, session.error = 'punching', ''
         session.started, session.next_probe = time.monotonic(), 0
         session.challenges.clear()
+        session.name_challenges.clear()
 
     def make_protocol(self, session, initial=None):
         config = QuicConfiguration(is_client=self.role == 'guest', alpn_protocols=['freep2p-mc/1'],
@@ -484,7 +522,10 @@ class TunnelNode(asyncio.DatagramProtocol):
         kind, payload = data[20:21], data[29:-32]
         session.addr, session.last_rx = addr, now
         if kind == b'P' and len(payload) == 16:
-            if self.role == 'host' and session.code['version'] == 2 and session.state != 'connected':
+            # Reply even to an older-format invitation: the sender may be a new
+            # app sharing a legacy code. Older apps ignore this packet kind.
+            session.send_name(payload)
+            if self.role == 'host' and session.code['version'] >= 2 and session.state != 'connected':
                 # A challenged, authenticated certificate reply replaces the ACK.
                 # The same socket/probe retry handles loss without a new service.
                 session.send(b'C', payload + self.cert.public_bytes(serialization.Encoding.DER))
@@ -498,7 +539,7 @@ class TunnelNode(asyncio.DatagramProtocol):
         elif (kind == b'C' and self.role == 'guest'
               and 16 < len(payload) <= 1040 and payload[:16] in session.challenges):
             nonce, der = payload[:16], payload[16:]
-            expected = (unb64(session.code['cert_sha256']) if session.code['version'] == 2
+            expected = (unb64(session.code['cert_sha256']) if session.code['version'] >= 2
                         else hashlib.sha256(unb64(session.code['cert'])).digest())
             if not hmac.compare_digest(hashlib.sha256(der).digest(), expected):
                 session.stop('친구의 연결 코드와 인증 정보가 다릅니다. 최신 코드를 다시 받아 주세요.')
@@ -514,6 +555,22 @@ class TunnelNode(asyncio.DatagramProtocol):
             session.rtt = (now - session.challenges.pop(nonce)) * 1000
             if session.protocol is None and session.state == 'punching':
                 self.make_protocol(session)
+        elif (kind == b'N' and session.code['version'] == 3 and 44 < len(payload) <= 204):
+            nonce = payload[:16]
+            issued = session.name_challenges.get(nonce)
+            if issued is None or now - issued > 20:
+                return
+            try:
+                key = hmac.digest(session.key, b'freep2p-name-v3/' + session.code['role'].encode('ascii'), 'sha256')
+                raw_name = AESGCM(key).decrypt(payload[16:28], payload[28:], b'FQN3' + session.sid + nonce)
+                name = raw_name.decode('utf-8')
+            except (InvalidTag, ValueError):
+                return
+            if not 1 <= len(name) <= 40 or not name.strip():
+                return
+            # Name replies have separate challenges: an ACK/certificate can arrive first.
+            session.name_challenges.pop(nonce)
+            session.code['name'] = name
         elif kind == b'Q':
             try:
                 header = pull_quic_header(Buffer(data=payload), host_cid_length=8)
@@ -553,6 +610,9 @@ class TunnelNode(asyncio.DatagramProtocol):
                     nonce = secrets.token_bytes(16)
                     session.challenges[nonce] = now
                     session.challenges = {k: v for k, v in session.challenges.items() if now - v < 20}
+                    if session.code['version'] == 3:
+                        session.name_challenges[nonce] = now
+                        session.name_challenges = {k: v for k, v in session.name_challenges.items() if now - v < 20}
                     session.send(b'P', nonce)
                     session.next_probe = now + (8 if session.state == 'connected' else .5)
                     if session.protocol and session.state == 'connected':

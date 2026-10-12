@@ -1,10 +1,10 @@
 # 실행하려는데 경고가 뜨나요?
 
-[사용법으로 돌아가기](USER_GUIDE.md) · [파일 받기](https://github.com/POBSIZ/FreeP2P/releases/tag/v0.3.0)
+[사용법으로 돌아가기](USER_GUIDE.md) · [파일 받기](https://github.com/POBSIZ/FreeP2P/releases/tag/v0.4.0)
 
 FreeP2P의 Windows 배포본에는 개발자를 확인하는 코드 서명이 없습니다.
 Mac 배포본도 Apple의 Developer ID 서명과 공증을 받지 않아 실행 시 경고가 나올 수 있습니다.
-**먼저 [FreeP2P 다운로드 페이지](https://github.com/POBSIZ/FreeP2P/releases/tag/v0.3.0)에서 직접 받은 파일인지 확인하세요.**
+**먼저 [FreeP2P 다운로드 페이지](https://github.com/POBSIZ/FreeP2P/releases/tag/v0.4.0)에서 직접 받은 파일인지 확인하세요.**
 출처를 모르는 파일이라면 실행하지 말고 이 페이지에서 다시 받으세요.
 
 아래 그림은 순서를 설명하기 위해 만든 안내 그림입니다. 실제 경고창과 생김새나 문구가 조금 다를 수 있습니다.
@@ -55,13 +55,13 @@ Mac 배포본도 Apple의 Developer ID 서명과 공증을 받지 않아 실행 
 압축 파일이 있는 폴더에서 Windows PowerShell은 다음 명령을 사용합니다.
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\FreeP2P-0.3.0-windows-x64.zip
+Get-FileHash -Algorithm SHA256 .\FreeP2P-0.4.0-windows-x64.zip
 ```
 
 Mac 터미널에서는 다음 명령을 사용합니다.
 
 ```bash
-shasum -a 256 FreeP2P-0.3.0-darwin-arm64.zip
+shasum -a 256 FreeP2P-0.4.0-darwin-arm64.zip
 ```
 
 명령 결과의 긴 영문·숫자 문자열을 `.sha256` 파일에 적힌 문자열과 비교하세요. 대소문자는 구분하지 않습니다.

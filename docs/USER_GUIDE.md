@@ -1,11 +1,11 @@
 # 친구와 함께 플레이하기
 
-[다운로드](https://github.com/POBSIZ/FreeP2P/releases/tag/v0.3.0) · [실행이 막힐 때](SECURITY_WARNINGS.md) · [잘 안 될 때](TROUBLESHOOTING.md)
+[다운로드](https://github.com/POBSIZ/FreeP2P/releases/tag/v0.4.0) · [실행이 막힐 때](SECURITY_WARNINGS.md) · [잘 안 될 때](TROUBLESHOOTING.md)
 
 먼저 **누구의 월드에서 놀지** 정하세요. 그 월드를 여는 사람을 앱에서는 ‘호스트’라고 부릅니다.
 나머지 친구들은 ‘참가자’입니다. 함께할 사람 모두 자기 컴퓨터에서 FreeP2P를 실행해야 합니다.
 
-**함께할 사람 모두 FreeP2P 0.3.0 이상을 사용하세요.** 이번 버전부터 공유 코드가 짧아졌습니다.
+**함께할 사람 모두 FreeP2P 0.4.0 이상을 사용하세요.** 호스트 연결 코드는 103자, 참가 코드는 60자입니다.
 이전 버전에서는 새 코드를 읽지 못하므로, 업데이트한 뒤 코드를 새로 주고받으세요.
 
 이 안내는 PC용 **Minecraft Java Edition** 기준입니다. 휴대폰·콘솔용 Minecraft나 Bedrock Edition에서는 사용할 수 없습니다.
@@ -15,7 +15,7 @@
 
 **Windows**
 
-1. [Windows용 파일 받기](https://github.com/POBSIZ/FreeP2P/releases/download/v0.3.0/FreeP2P-0.3.0-windows-x64.zip)를 누릅니다.
+1. [Windows용 파일 받기](https://github.com/POBSIZ/FreeP2P/releases/download/v0.4.0/FreeP2P-0.4.0-windows-x64.zip)를 누릅니다.
 2. 받은 파일을 마우스 오른쪽 버튼으로 누르고 **모두 압축 풀기**를 선택합니다.
 3. 풀린 폴더 안의 `FreeP2P` 폴더를 엽니다.
 4. `FreeP2P.exe`를 두 번 클릭합니다. 파일 확장자가 숨겨져 있으면 `FreeP2P`로 보일 수 있습니다.
@@ -24,7 +24,7 @@
 
 **Mac**
 
-1. [Mac용 파일 받기](https://github.com/POBSIZ/FreeP2P/releases/download/v0.3.0/FreeP2P-0.3.0-darwin-arm64.zip)를 누릅니다.
+1. [Mac용 파일 받기](https://github.com/POBSIZ/FreeP2P/releases/download/v0.4.0/FreeP2P-0.4.0-darwin-arm64.zip)를 누릅니다.
 2. 받은 압축 파일을 두 번 클릭합니다.
 3. 풀린 `FreeP2P` 앱을 엽니다. 응용 프로그램 폴더로 옮겨도 됩니다.
 
@@ -104,6 +104,7 @@ Mac용은 M1·M2·M3 등 **M 시리즈 Mac**에서 사용할 수 있습니다.
 
 추가할 친구가 더 있으면 4~6번을 각 친구와 반복하세요.
 코드를 등록한 친구와 서로의 화면에 **연결됨**이 나오는지 확인합니다. 연결된 친구부터 다음 단계로 진행하면 됩니다.
+등록 직후에는 친구 이름 대신 임시 이름이 보일 수 있습니다. 상대 프로그램에서 응답이 오면 친구가 정한 이름으로 바뀝니다.
 
 ## 7. 들어갈 친구: Minecraft에서 접속
 

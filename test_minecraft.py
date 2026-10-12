@@ -9,9 +9,10 @@ import unittest
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from freep2p import encode
-from mc_tunnel import MAGIC, TunnelNode, b64
+from mc_tunnel import MAGIC, TunnelNode, b64, decode_code, encode_code
 from minecraft_web import create_app
 
 
@@ -34,6 +35,13 @@ def legacy_code(node, cert=None):
     if node.role == 'host':
         data['cert'] = b64((cert or node.cert).public_bytes(serialization.Encoding.DER))
     return 'fpm1:' + b64(encode(data))
+
+
+def encrypted_name(session, sender_role, challenge, name):
+    nonce = bytes(range(12))
+    key = hmac.digest(session.key, b'freep2p-name-v3/' + sender_role.encode('ascii'), 'sha256')
+    encrypted = AESGCM(key).encrypt(nonce, name, b'FQN3' + session.sid + challenge)
+    return challenge + nonce + encrypted
 
 
 class MinecraftTunnelTests(unittest.IsolatedAsyncioTestCase):
@@ -69,6 +77,8 @@ class MinecraftTunnelTests(unittest.IsolatedAsyncioTestCase):
         guest.add_peer(host.code)
         host.add_peer(guest.code)
         await wait_for(lambda: all(s.state == 'connected' for n in (host, guest) for s in n.sessions.values()))
+        await wait_for(lambda: next(iter(host.sessions.values())).code['name'] == guest.name
+                       and next(iter(guest.sessions.values())).code['name'] == host.name)
         return host, guest
 
     async def exchange(self, guest, payload):
@@ -142,13 +152,188 @@ class MinecraftTunnelTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(session.state, 'connected')
 
     async def test_legacy_and_mixed_code_formats_connect(self):
-        for host_legacy, guest_legacy in ((True, True), (True, False)):
-            with self.subTest(host_legacy=host_legacy, guest_legacy=guest_legacy):
+        for host_version, guest_version in ((1, 1), (1, 3), (2, 2), (2, 3), (3, 2)):
+            with self.subTest(host_version=host_version, guest_version=guest_version):
                 host, guest = await self.node('host'), await self.node('guest')
-                guest_session = guest.add_peer(legacy_code(host) if host_legacy else host.code)
-                host_session = host.add_peer(legacy_code(guest) if guest_legacy else guest.code)
+                def code_for(node, version):
+                    return (legacy_code(node) if version == 1
+                            else encode_code(decode_code(legacy_code(node)), version=version))
+                guest_session = guest.add_peer(code_for(host, host_version))
+                host_session = host.add_peer(code_for(guest, guest_version))
                 await wait_for(lambda: guest_session.state == host_session.state == 'connected')
+                await wait_for(lambda: guest_session.code['name'] == host.name
+                               and host_session.code['name'] == guest.name)
                 await self.exchange(guest, b'compatible code exchange')
+
+    async def test_names_arrive_before_or_after_the_certificate(self):
+        for name_first in (True, False):
+            with self.subTest(name_first=name_first):
+                host, guest = await self.node('host'), await self.node('guest')
+                host.name, guest.name = '친구의 월드 🧱', '함께 할 친구'
+                guest_session = guest.add_peer(host.code)
+                host_session = host.add_peer(guest.code)
+                self.assertTrue(guest_session.code['name'].startswith('호스트'))
+                self.assertTrue(host_session.code['name'].startswith('참가자'))
+                original = host_session.send
+                held = {}
+                delivered = asyncio.Event()
+
+                def deliver_second(kind, payload):
+                    original(kind, payload)
+                    delivered.set()
+
+                def ordered(kind, payload):
+                    if kind in (b'C', b'N') and not delivered.is_set():
+                        held[kind] = payload
+                        if len(held) == 2:
+                            first, second = (b'N', b'C') if name_first else (b'C', b'N')
+                            original(first, held[first])
+                            asyncio.get_running_loop().call_later(.03, deliver_second, second, held[second])
+                        return
+                    original(kind, payload)
+
+                host_session.send = ordered
+                await wait_for(lambda: guest_session.state == host_session.state == 'connected')
+                await asyncio.wait_for(delivered.wait(), 2)
+                await wait_for(lambda: guest_session.code['name'] == host.name
+                               and host_session.code['name'] == guest.name)
+                await self.exchange(guest, b'names do not alter the authenticated TCP tunnel')
+                host_session.send = original
+
+    async def test_name_response_loss_and_reordering_recover(self):
+        host, guest = await self.node('host'), await self.node('guest')
+        host.timeout = guest.timeout = 5
+        guest_session = guest.add_peer(host.code)
+        host_session = host.add_peer(guest.code)
+        original = host_session.send
+        responses = 0
+        held = None
+        delayed = asyncio.Event()
+
+        def deliver_late(payload):
+            original(b'N', payload)
+            delayed.set()
+
+        def lossy(kind, payload):
+            nonlocal responses, held
+            if kind == b'N':
+                responses += 1
+                if responses == 1:
+                    return
+                if responses == 2:
+                    held = payload
+                    return
+                if responses == 3:
+                    original(kind, payload)
+                    asyncio.get_running_loop().call_later(.03, deliver_late, held)
+                    return
+            original(kind, payload)
+
+        host_session.send = lossy
+        await wait_for(lambda: guest_session.state == host_session.state == 'connected', 5)
+        self.assertNotEqual(guest_session.code['name'], host.name)
+        await self.exchange(guest, b'game works while the name response is missing')
+        # Advance the normal keepalive probes without waiting two eight-second periods.
+        guest_session.next_probe = 0
+        await wait_for(lambda: responses >= 2)
+        guest_session.next_probe = 0
+        await asyncio.wait_for(delayed.wait(), 2)
+        self.assertGreaterEqual(responses, 3)
+        self.assertEqual(guest_session.code['name'], host.name)
+        self.assertEqual(host_session.code['name'], guest.name)
+        await self.exchange(guest, b'name packet loss preserves game connection')
+
+    async def test_unverified_or_invalid_names_do_not_change_peer_identity(self):
+        host, guest = await self.node('host'), await self.node('guest')
+        for node in self.nodes:
+            node.tick_task.cancel()
+        await asyncio.gather(*(node.tick_task for node in self.nodes), return_exceptions=True)
+        nonce = bytes(range(16))
+        valid_name = ('🧱' * 40).encode('utf-8')
+        cases = (
+            ('unknown nonce', b'Imposter', True),
+            ('invalid HMAC', b'Imposter', False),
+            ('invalid tag', b'Imposter', True),
+            ('wrong direction key', b'Imposter', True),
+            ('wrong associated challenge', b'Imposter', True),
+            ('invalid UTF-8', b'\xff', True),
+            ('empty name', b'', True),
+            ('too many characters', b'A' * 41, True),
+            ('too many UTF-8 bytes', ('🧱' * 41).encode('utf-8'), True),
+            ('whitespace only', b' \t\n ', True),
+        )
+        for label, raw_name, valid_mac in cases:
+            with self.subTest(packet=label):
+                session = host.add_peer(guest.code)
+                original_name = session.code['name']
+                session.name_challenges[nonce] = time.monotonic()
+                try:
+                    challenge = b'unknown nonce!!!' if label in ('unknown nonce', 'wrong associated challenge') else nonce
+                    role = 'host' if label == 'wrong direction key' else 'guest'
+                    payload = encrypted_name(session, role, challenge, raw_name)
+                    if label == 'invalid tag':
+                        payload = payload[:-1] + bytes([payload[-1] ^ 1])
+                    elif label == 'wrong associated challenge':
+                        payload = nonce + payload[16:]
+                    def deliver(body, sequence, authenticated=True):
+                        header = MAGIC + session.sid + b'N' + sequence.to_bytes(8, 'big') + body
+                        mac = hmac.digest(session.key, header, 'sha256') if authenticated else b'\0' * 32
+                        host.datagram_received(header + mac, guest.public)
+                    deliver(payload, 1, valid_mac)
+                    self.assertEqual(session.code['name'], original_name)
+                    self.assertIn(nonce, session.name_challenges)
+                    self.assertEqual(session.state, 'punching')
+                    self.assertIsNone(session.protocol)
+                    deliver(encrypted_name(session, 'guest', nonce, valid_name), 2)
+                    self.assertEqual(session.code['name'], '🧱' * 40)
+                    self.assertNotIn(nonce, session.name_challenges)
+                    deliver(encrypted_name(session, 'guest', nonce, b'Replayed name'), 3)
+                    self.assertEqual(session.code['name'], '🧱' * 40)
+                finally:
+                    host.remove_peer(session.sid.hex())
+
+    async def test_expired_name_challenge_is_rejected(self):
+        host, guest = await self.node('host'), await self.node('guest')
+        for node in self.nodes:
+            node.tick_task.cancel()
+        await asyncio.gather(*(node.tick_task for node in self.nodes), return_exceptions=True)
+        session = host.add_peer(guest.code)
+        original_name = session.code['name']
+        nonce = bytes(range(16))
+        session.name_challenges[nonce] = time.monotonic() - 21
+        payload = encrypted_name(session, 'guest', nonce, b'Expired name')
+        header = MAGIC + session.sid + b'N' + (1).to_bytes(8, 'big') + payload
+        host.datagram_received(header + hmac.digest(session.key, header, 'sha256'), guest.public)
+        self.assertEqual(session.code['name'], original_name)
+
+    async def test_name_responses_encrypt_the_display_name_with_fresh_nonces(self):
+        host, guest = await self.node('host'), await self.node('guest')
+        host.name = '친구와 함께 하는 비공개 월드'
+        session = host.add_peer(guest.code)
+        packets = []
+        session.send = lambda kind, payload: packets.append((kind, payload))
+        challenge = bytes(range(16))
+        session.send_name(challenge)
+        session.send_name(challenge)
+        self.assertEqual(len(packets), 2)
+        first, second = packets[0][1], packets[1][1]
+        self.assertEqual([kind for kind, _ in packets], [b'N', b'N'])
+        self.assertEqual(first[:16], challenge)
+        self.assertEqual(second[:16], challenge)
+        self.assertNotEqual(first[16:28], second[16:28])
+        key = hmac.digest(session.key, b'freep2p-name-v3/host', 'sha256')
+        for payload in (first, second):
+            self.assertNotIn(host.name.encode('utf-8'), payload)
+            self.assertEqual(AESGCM(key).decrypt(payload[16:28], payload[28:],
+                                               b'FQN3' + session.sid + challenge).decode('utf-8'), host.name)
+        receiver = guest.add_peer(host.code)
+        receiver.name_challenges[challenge] = time.monotonic()
+        header = MAGIC + session.sid + b'N' + (1).to_bytes(8, 'big') + first
+        guest.datagram_received(header + hmac.digest(session.key, header, 'sha256'), host.public)
+        self.assertEqual(receiver.code['name'], host.name)
+        self.assertEqual(receiver.state, 'punching')
+        self.assertIsNone(receiver.peer_certificate)
+        self.assertIsNone(receiver.protocol)
 
     async def test_initial_certificate_response_loss_and_reordering_recover(self):
         host, guest = await self.node('host'), await self.node('guest')
@@ -262,7 +447,7 @@ class MinecraftTunnelTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(response.status, 200, await response.text())
                 async with client.get(url, headers=auth) as response:
                     state = await response.json()
-                    self.assertTrue(state['node']['code'].startswith('fpm2:'))
+                    self.assertTrue(state['node']['code'].startswith('f3h:'))
                     self.assertEqual(state['node']['max_peers'], 32)
                 async with client.post(server.make_url('/api/settings'), headers=auth, json={'max_peers':48}) as response:
                     self.assertEqual(response.status, 200)

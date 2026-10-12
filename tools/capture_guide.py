@@ -51,14 +51,14 @@ async def main():
             await page.locator('#port').fill('51234')
             await page.locator('#setup .setup-card').screenshot(path=str(OUT/'host-setup.png'))
             await page.locator('#choose-guest').click()
-            await page.locator('#host-code').fill('fpm2:호스트가_보낸_전체_코드 (연결 불가 예시)')
+            await page.locator('#host-code').fill('f3h:호스트가_보낸_전체_코드 (연결 불가 예시)')
             await page.locator('#setup .setup-card').screenshot(path=str(OUT/'guest-setup.png'))
             await page.locator('#guest-options summary').click()
             await page.locator('#listen-port').fill('25566')
             await page.locator('#guest-options').screenshot(path=str(OUT/'guest-options.png'))
             await page.locator('#guest-options summary').click()
             node = {'role':'host','name':'친구들과 생존 월드','status':'ready',
-                    'code':'fpm2:가이드용_예시입니다_실제_연결_불가',
+                    'code':'f3h:가이드용_예시입니다_실제_연결_불가',
                     'public':'192.0.2.10:40000','udp_port':40000,'game_port':51234,
                     'listen_port':25565,'max_peers':16,'peers':[],
                     'events':[{'time':'12:00','message':'가이드용 예시 화면입니다. 실제 연결 정보가 아닙니다.'}]}
@@ -68,7 +68,7 @@ async def main():
             await page.locator('#copy-code').click()
             await expect(page.locator('#next-title')).to_have_text('친구가 보내 준 코드를 등록하세요')
             await page.locator('.next-step').screenshot(path=str(OUT/'next-step.png'))
-            await page.locator('#guest-code').fill('fpm2:친구가_돌려준_전체_코드 (연결 불가 예시)')
+            await page.locator('#guest-code').fill('f3g:친구가_돌려준_전체_코드 (연결 불가 예시)')
             await page.locator('#add-panel').screenshot(path=str(OUT/'register-peer.png'))
             await page.locator('#live-options summary').click()
             await page.locator('#live-max-peers').fill('32')
@@ -85,6 +85,7 @@ async def main():
             await page.screenshot(path=str(OUT/'overview.png'), full_page=True)
             node['role'] = 'guest'
             node['name'] = '참가자 (예시)'
+            node['code'] = 'f3g:가이드용_예시입니다_실제_연결_불가'
             node['peers'][0].update(state='punching', streams=0, uploaded=0, downloaded=0, rtt=None)
             await expect(page.locator('#count-title')).to_have_text('친구와의 연결')
             await page.locator('.code-panel').screenshot(path=str(OUT/'guest-code.png'))
