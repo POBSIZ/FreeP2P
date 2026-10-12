@@ -1,11 +1,11 @@
 # 실행하려는데 경고가 뜨나요?
 
-[사용법으로 돌아가기](USER_GUIDE.md) · [파일 받기](https://github.com/POBSIZ/FreeP2P/releases/tag/v0.2.0)
+[사용법으로 돌아가기](USER_GUIDE.md) · [파일 받기](https://github.com/POBSIZ/FreeP2P/releases/tag/v0.3.0)
 
 FreeP2P는 아직 Windows와 Apple의 개발자 확인 절차를 거치지 않아 처음 열 때 경고가 나올 수 있습니다.
 **이 저장소에서 직접 받은 파일인지 먼저 확인하세요.** 모르는 사람이 따로 보낸 파일이라면 아래 다운로드 페이지에서 다시 받는 편이 좋습니다.
 
-[FreeP2P 다운로드 페이지](https://github.com/POBSIZ/FreeP2P/releases/tag/v0.2.0)
+[FreeP2P 다운로드 페이지](https://github.com/POBSIZ/FreeP2P/releases/tag/v0.3.0)
 
 아래 그림은 순서를 설명하기 위해 만든 안내 그림입니다. 실제 경고창과 생김새나 문구가 조금 다를 수 있습니다.
 
@@ -52,13 +52,13 @@ FreeP2P가 친구의 컴퓨터와 통신해도 되는지 묻는 별도의 창입
 압축 파일이 있는 폴더에서 Windows PowerShell은 다음 명령을 사용합니다.
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\FreeP2P-0.2.0-windows-x64.zip
+Get-FileHash -Algorithm SHA256 .\FreeP2P-0.3.0-windows-x64.zip
 ```
 
 Mac 터미널에서는 다음 명령을 사용합니다.
 
 ```bash
-shasum -a 256 FreeP2P-0.2.0-darwin-arm64.zip
+shasum -a 256 FreeP2P-0.3.0-darwin-arm64.zip
 ```
 
 나온 문자열이 같은 이름의 `.sha256` 파일 내용과 일치해야 합니다.

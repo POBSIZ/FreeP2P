@@ -1,12 +1,17 @@
 import asyncio
+import hashlib
+import hmac
 import os
 import socket
+import time
 import unittest
 
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
+from cryptography.hazmat.primitives import serialization
 
-from mc_tunnel import TunnelNode, decode_code
+from freep2p import encode
+from mc_tunnel import MAGIC, TunnelNode, b64
 from minecraft_web import create_app
 
 
@@ -21,6 +26,14 @@ async def wait_for(predicate, timeout=8):
         while not predicate():
             await asyncio.sleep(.025)
     await asyncio.wait_for(poll(), timeout)
+
+
+def legacy_code(node, cert=None):
+    data = {'role': node.role, 'name': node.name, 'ip': node.public[0],
+            'port': node.public[1], 'token': b64(node.token)}
+    if node.role == 'host':
+        data['cert'] = b64((cert or node.cert).public_bytes(serialization.Encoding.DER))
+    return 'fpm1:' + b64(encode(data))
 
 
 class MinecraftTunnelTests(unittest.IsolatedAsyncioTestCase):
@@ -122,15 +135,98 @@ class MinecraftTunnelTests(unittest.IsolatedAsyncioTestCase):
         await self.exchange(second, b'other guest still works')
 
     async def test_wrong_host_certificate_rejected(self):
-        from freep2p import encode
-        from mc_tunnel import b64
         host, guest, other = await self.node('host'), await self.node('guest'), await self.node('host')
-        code = decode_code(host.code)
-        code['cert'] = decode_code(other.code)['cert']
-        session = guest.add_peer('fpm1:' + b64(encode(code)))
-        host.add_peer(guest.code)
+        session = guest.add_peer(legacy_code(host, other.cert))
+        host.add_peer(legacy_code(guest))
         await wait_for(lambda: session.state == 'failed', 5)
         self.assertNotEqual(session.state, 'connected')
+
+    async def test_legacy_and_mixed_code_formats_connect(self):
+        for host_legacy, guest_legacy in ((True, True), (True, False)):
+            with self.subTest(host_legacy=host_legacy, guest_legacy=guest_legacy):
+                host, guest = await self.node('host'), await self.node('guest')
+                guest_session = guest.add_peer(legacy_code(host) if host_legacy else host.code)
+                host_session = host.add_peer(legacy_code(guest) if guest_legacy else guest.code)
+                await wait_for(lambda: guest_session.state == host_session.state == 'connected')
+                await self.exchange(guest, b'compatible code exchange')
+
+    async def test_initial_certificate_response_loss_and_reordering_recover(self):
+        host, guest = await self.node('host'), await self.node('guest')
+        host.timeout = guest.timeout = 5
+        guest_session = guest.add_peer(host.code)
+        host_session = host.add_peer(guest.code)
+        original = host_session.send
+        responses = 0
+        held_response = None
+        delayed = asyncio.Event()
+
+        def deliver_late(kind, payload):
+            original(kind, payload)
+            delayed.set()
+
+        def lossy(kind, payload):
+            nonlocal responses, held_response
+            if kind == b'C':
+                responses += 1
+                if responses == 1:
+                    return
+                if responses == 2:
+                    held_response = (kind, payload)
+                    return
+                if responses == 3:
+                    original(kind, payload)
+                    asyncio.get_running_loop().call_later(.03, deliver_late, *held_response)
+                    return
+            original(kind, payload)
+
+        host_session.send = lossy
+        await wait_for(lambda: guest_session.state == host_session.state == 'connected', 5)
+        await asyncio.wait_for(delayed.wait(), 2)
+        self.assertGreaterEqual(responses, 3)
+        self.assertEqual(guest_session.peer_certificate, host.cert.public_bytes(serialization.Encoding.DER))
+        await self.exchange(guest, os.urandom(65536))
+
+    async def test_unverified_certificate_packets_cannot_start_quic(self):
+        host, guest, other = await self.node('host'), await self.node('guest'), await self.node('host')
+        for node in self.nodes:
+            node.tick_task.cancel()
+        await asyncio.gather(*(node.tick_task for node in self.nodes), return_exceptions=True)
+        der = host.cert.public_bytes(serialization.Encoding.DER)
+        other_der = other.cert.public_bytes(serialization.Encoding.DER)
+        nonce = bytes(range(16))
+        cases = (
+            ('unknown nonce', b'C', b'unknown nonce!!!' + der, True, None, 'punching'),
+            ('wrong fingerprint', b'C', nonce + other_der, True, None, 'failed'),
+            ('invalid HMAC', b'C', nonce + der, False, None, 'punching'),
+            ('invalid DER', b'C', nonce + b'invalid DER', True,
+             b64(hashlib.sha256(b'invalid DER').digest()), 'failed'),
+            ('empty certificate', b'C', nonce, True, None, 'punching'),
+            ('ACK without certificate', b'A', nonce, True, None, 'punching'),
+        )
+        for label, kind, payload, valid_mac, fingerprint, expected_state in cases:
+            with self.subTest(packet=label):
+                session = guest.add_peer(host.code)
+                session.challenges[nonce] = time.monotonic()
+                if fingerprint:
+                    session.code['cert_sha256'] = fingerprint
+                try:
+                    self.assertEqual(session.state, 'punching')
+                    header = MAGIC + session.sid + kind + (1).to_bytes(8, 'big') + payload
+                    mac = hmac.digest(session.key, header, 'sha256') if valid_mac else b'\0' * 32
+                    guest.datagram_received(header + mac, host.public)
+                    self.assertEqual(session.state, expected_state)
+                    self.assertIsNone(session.protocol)
+                    self.assertIsNone(session.peer_certificate)
+                finally:
+                    guest.remove_peer(session.sid.hex())
+
+    async def test_retry_reestablishes_compact_code_session(self):
+        host, guest = await self.pair()
+        guest_session = next(iter(guest.sessions.values()))
+        host_session = next(iter(host.sessions.values()))
+        guest.retry_peer(guest_session.sid.hex())
+        await wait_for(lambda: guest_session.state == host_session.state == 'connected')
+        await self.exchange(guest, b'retry retains authenticated identity')
 
     async def test_configurable_limit_enforced_and_change_preserves_peers(self):
         host, first, second = await self.node('host'), await self.node('guest'), await self.node('guest')
@@ -166,7 +262,7 @@ class MinecraftTunnelTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(response.status, 200, await response.text())
                 async with client.get(url, headers=auth) as response:
                     state = await response.json()
-                    self.assertTrue(state['node']['code'].startswith('fpm1:'))
+                    self.assertTrue(state['node']['code'].startswith('fpm2:'))
                     self.assertEqual(state['node']['max_peers'], 32)
                 async with client.post(server.make_url('/api/settings'), headers=auth, json={'max_peers':48}) as response:
                     self.assertEqual(response.status, 200)

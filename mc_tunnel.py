@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import hashlib
 import hmac
 import ipaddress
@@ -30,13 +31,15 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from freep2p import COOKIE, DEFAULT_STUN, encode, parse_stun
+from freep2p import COOKIE, DEFAULT_STUN, parse_stun
 
 MAGIC = b'FQM1'
 CHUNK = 16384
 WINDOW = 16
 DEFAULT_MAX_PEERS = 16
 MAX_STREAMS = 16
+CODE_HEADER = struct.Struct('!B4sH')
+MAX_COMPACT_BYTES = CODE_HEADER.size + 32 + 32 + 160 + 4
 
 
 def b64(data):
@@ -47,25 +50,80 @@ def unb64(text):
     return base64.b64decode(text + '=' * (-len(text) % 4), altchars=b'-_', validate=True)
 
 
+def validate_code_fields(obj):
+    if not isinstance(obj, dict) or not isinstance(obj['ip'], str):
+        raise ValueError()
+    ip = ipaddress.IPv4Address(obj['ip'])
+    if ip.is_unspecified or ip.is_multicast or ip == ipaddress.IPv4Address('255.255.255.255'):
+        raise ValueError()
+    if type(obj['port']) is not int or not 1 <= obj['port'] <= 65535:
+        raise ValueError()
+    if obj['role'] not in ('host', 'guest') or len(unb64(obj['token'])) != 32:
+        raise ValueError()
+    if not isinstance(obj['name'], str) or not 1 <= len(obj['name']) <= 40:
+        raise ValueError()
+    obj['name'].encode('utf-8')
+
+
+def encode_code(obj):
+    """Pack endpoint, full-strength token, certificate pin and UTF-8 display name."""
+    validate_code_fields(obj)
+    payload = CODE_HEADER.pack(0 if obj['role'] == 'host' else 1,
+                               ipaddress.IPv4Address(obj['ip']).packed, obj['port'])
+    payload += unb64(obj['token'])
+    if obj['role'] == 'host':
+        fingerprint = (hashlib.sha256(unb64(obj['cert'])).digest() if 'cert' in obj
+                       else unb64(obj['cert_sha256']))
+        if len(fingerprint) != 32:
+            raise ValueError('인증서 지문이 올바르지 않습니다.')
+        payload += fingerprint
+    payload += obj['name'].encode('utf-8')
+    # Typo detection only; peer authentication still uses HMAC and pinned TLS.
+    payload += struct.pack('!I', binascii.crc32(payload))
+    return 'fpm2:' + b64(payload)
+
+
 def decode_code(code):
     try:
-        if not isinstance(code, str) or not code.startswith('fpm1:') or len(code) > 4096:
+        if not isinstance(code, str) or len(code) > 4096:
             raise ValueError()
-        obj = json.loads(unb64(code[5:]))
-        ip = ipaddress.IPv4Address(obj['ip'])
-        if ip.is_unspecified or ip.is_multicast or ip == ipaddress.IPv4Address('255.255.255.255'):
+        if code.startswith('fpm2:'):
+            raw = unb64(code[5:])
+            if not 44 <= len(raw) <= MAX_COMPACT_BYTES:
+                raise ValueError()
+            payload, checksum = raw[:-4], raw[-4:]
+            if checksum != struct.pack('!I', binascii.crc32(payload)):
+                raise ValueError()
+            role, address, port = CODE_HEADER.unpack_from(payload)
+            if role not in (0, 1):
+                raise ValueError()
+            pos = CODE_HEADER.size + 32
+            obj = {'role': 'host' if role == 0 else 'guest', 'ip': str(ipaddress.IPv4Address(address)),
+                   'port': port, 'token': b64(payload[CODE_HEADER.size:pos]), 'version': 2}
+            if role == 0:
+                fingerprint = payload[pos:pos + 32]
+                if len(fingerprint) != 32:
+                    raise ValueError()
+                obj['cert_sha256'] = b64(fingerprint)
+                pos += 32
+            obj['name'] = payload[pos:].decode('utf-8')
+        elif code.startswith('fpm1:'):
+            legacy = json.loads(unb64(code[5:]))
+            if not isinstance(legacy, dict):
+                raise ValueError()
+            # The prefix determines capabilities, never an arbitrary JSON field.
+            obj = {key: legacy[key] for key in ('role', 'ip', 'port', 'token', 'name')}
+            obj['version'] = 1
+            if obj['role'] == 'host':
+                der = unb64(legacy['cert'])
+                x509.load_der_x509_certificate(der)
+                obj['cert'] = b64(der)
+        else:
             raise ValueError()
-        if type(obj['port']) is not int or not 1 <= obj['port'] <= 65535:
-            raise ValueError()
-        if obj['role'] not in ('host', 'guest') or len(unb64(obj['token'])) != 32:
-            raise ValueError()
-        if not isinstance(obj['name'], str) or not 1 <= len(obj['name']) <= 40:
-            raise ValueError()
-        if obj['role'] == 'host':
-            x509.load_der_x509_certificate(unb64(obj['cert']))
+        validate_code_fields(obj)
         return obj
-    except (ValueError, TypeError, KeyError):
-        raise ValueError('올바른 fpm1: 연결 코드 전체를 입력하세요.') from None
+    except (ValueError, TypeError, KeyError, struct.error, RecursionError):
+        raise ValueError('연결 코드가 잘렸거나 잘못되었습니다. 친구가 보낸 코드 전체를 다시 복사해 주세요.') from None
 
 
 def certificate():
@@ -91,6 +149,7 @@ class Session:
     state: str = 'punching'
     error: str = ''
     protocol: object = None
+    peer_certificate: bytes | None = None
     original_cid: bytes = b''
     tx: int = 0
     highest: int = 0
@@ -262,6 +321,10 @@ class TunnelNode(asyncio.DatagramProtocol):
             raise ValueError('호스트 또는 참가자를 선택하세요.')
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 40:
             raise ValueError('이름은 1~40자로 입력하세요.')
+        try:
+            name.encode('utf-8')
+        except UnicodeError:
+            raise ValueError('표시 이름에 사용할 수 없는 문자가 있습니다.') from None
         for port in (game_port, listen_port):
             if type(port) is not int or not 1 <= port <= 65535:
                 raise ValueError('포트는 1~65535 범위여야 합니다.')
@@ -329,7 +392,7 @@ class TunnelNode(asyncio.DatagramProtocol):
                 'port': self.public[1], 'token': b64(self.token)}
         if self.cert:
             data['cert'] = b64(self.cert.public_bytes(serialization.Encoding.DER))
-        return 'fpm1:' + b64(encode(data))
+        return encode_code(data)
 
     def set_max_peers(self, value):
         if type(value) is not int or not 1 <= value <= 9007199254740991:
@@ -349,6 +412,8 @@ class TunnelNode(asyncio.DatagramProtocol):
         if sid in self.sessions:
             raise ValueError('이미 등록된 상대입니다.')
         session = Session(self, other, sid, key, (other['ip'], other['port']))
+        if self.role == 'guest' and other['version'] == 1:
+            session.peer_certificate = unb64(other['cert'])
         self.sessions[sid] = session
         self.log(f"{other['name']} · 연결 탐색 시작")
         return session
@@ -374,7 +439,9 @@ class TunnelNode(asyncio.DatagramProtocol):
             quic = QuicConnection(configuration=config, original_destination_connection_id=initial)
             session.original_cid = initial
         else:
-            cert = x509.load_der_x509_certificate(unb64(session.code['cert']))
+            if session.peer_certificate is None:
+                raise ValueError('호스트 인증서를 아직 확인하지 못했습니다.')
+            cert = x509.load_der_x509_certificate(session.peer_certificate)
             config.load_verify_locations(cadata=cert.public_bytes(serialization.Encoding.PEM))
             config.server_name = 'freep2p.local'
             quic = QuicConnection(configuration=config)
@@ -417,10 +484,35 @@ class TunnelNode(asyncio.DatagramProtocol):
         kind, payload = data[20:21], data[29:-32]
         session.addr, session.last_rx = addr, now
         if kind == b'P' and len(payload) == 16:
-            session.send(b'A', payload)
+            if self.role == 'host' and session.code['version'] == 2 and session.state != 'connected':
+                # A challenged, authenticated certificate reply replaces the ACK.
+                # The same socket/probe retry handles loss without a new service.
+                session.send(b'C', payload + self.cert.public_bytes(serialization.Encoding.DER))
+            else:
+                session.send(b'A', payload)
         elif kind == b'A' and payload in session.challenges:
             session.rtt = (now - session.challenges.pop(payload)) * 1000
-            if self.role == 'guest' and session.protocol is None and session.state == 'punching':
+            if (self.role == 'guest' and session.peer_certificate is not None
+                    and session.protocol is None and session.state == 'punching'):
+                self.make_protocol(session)
+        elif (kind == b'C' and self.role == 'guest'
+              and 16 < len(payload) <= 1040 and payload[:16] in session.challenges):
+            nonce, der = payload[:16], payload[16:]
+            expected = (unb64(session.code['cert_sha256']) if session.code['version'] == 2
+                        else hashlib.sha256(unb64(session.code['cert'])).digest())
+            if not hmac.compare_digest(hashlib.sha256(der).digest(), expected):
+                session.stop('친구의 연결 코드와 인증 정보가 다릅니다. 최신 코드를 다시 받아 주세요.')
+                session.state = 'failed'
+                return
+            try:
+                x509.load_der_x509_certificate(der)
+            except ValueError:
+                session.stop('친구의 인증 정보를 읽지 못했습니다. 연결을 끝내고 다시 시작해 주세요.')
+                session.state = 'failed'
+                return
+            session.peer_certificate = der
+            session.rtt = (now - session.challenges.pop(nonce)) * 1000
+            if session.protocol is None and session.state == 'punching':
                 self.make_protocol(session)
         elif kind == b'Q':
             try:

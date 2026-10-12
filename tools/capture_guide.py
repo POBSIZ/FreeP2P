@@ -51,14 +51,14 @@ async def main():
             await page.locator('#port').fill('51234')
             await page.locator('#setup .setup-card').screenshot(path=str(OUT/'host-setup.png'))
             await page.locator('#choose-guest').click()
-            await page.locator('#host-code').fill('fpm1:호스트가_보낸_전체_코드 (연결 불가 예시)')
+            await page.locator('#host-code').fill('fpm2:호스트가_보낸_전체_코드 (연결 불가 예시)')
             await page.locator('#setup .setup-card').screenshot(path=str(OUT/'guest-setup.png'))
             await page.locator('#guest-options summary').click()
             await page.locator('#listen-port').fill('25566')
             await page.locator('#guest-options').screenshot(path=str(OUT/'guest-options.png'))
             await page.locator('#guest-options summary').click()
             node = {'role':'host','name':'친구들과 생존 월드','status':'ready',
-                    'code':'fpm1:가이드용_예시입니다_실제_연결_불가',
+                    'code':'fpm2:가이드용_예시입니다_실제_연결_불가',
                     'public':'192.0.2.10:40000','udp_port':40000,'game_port':51234,
                     'listen_port':25565,'max_peers':16,'peers':[],
                     'events':[{'time':'12:00','message':'가이드용 예시 화면입니다. 실제 연결 정보가 아닙니다.'}]}
@@ -68,7 +68,7 @@ async def main():
             await page.locator('#copy-code').click()
             await expect(page.locator('#next-title')).to_have_text('친구가 보내 준 코드를 등록하세요')
             await page.locator('.next-step').screenshot(path=str(OUT/'next-step.png'))
-            await page.locator('#guest-code').fill('fpm1:친구가_돌려준_전체_코드 (연결 불가 예시)')
+            await page.locator('#guest-code').fill('fpm2:친구가_돌려준_전체_코드 (연결 불가 예시)')
             await page.locator('#add-panel').screenshot(path=str(OUT/'register-peer.png'))
             await page.locator('#live-options summary').click()
             await page.locator('#live-max-peers').fill('32')
@@ -106,7 +106,7 @@ async def main():
             await diagram(page,'minecraft-join.png','들어갈 친구가 할 일','게임에서 누를 메뉴를 설명한 그림입니다. 실제 게임 화면은 아닙니다.',[
                 ('연결됨 기다리기','코드를 서로 주고받고 등록했다면 연결됨이 나올 때까지 기다립니다.','게임 접속 주소 복사'),
                 ('게임으로 돌아가기','Minecraft에서 멀티플레이를 누른 다음 직접 연결을 선택합니다.','멀티플레이 → 직접 연결'),
-                ('복사한 주소 넣기','서버 주소 칸에 방금 복사한 내용을 그대로 붙여넣고 접속합니다.','예: 127.0.0.1:25565')], '메신저로 주고받은 긴 코드를 넣는 곳이 아닙니다. 자기 FreeP2P의 게임 접속 주소 복사 버튼을 사용하세요.')
+                ('복사한 주소 넣기','서버 주소 칸에 방금 복사한 내용을 그대로 붙여넣고 접속합니다.','예: 127.0.0.1:25565')], '메신저로 주고받은 연결 코드를 넣는 곳이 아닙니다. 자기 FreeP2P의 게임 접속 주소 복사 버튼을 사용하세요.')
             await diagram(page,'windows-warning.png','Windows에서 실행을 막는 경고가 뜬다면','순서를 설명한 안내 그림입니다. 실제 경고창과 모양이 다를 수 있습니다.',[
                 ('받은 곳 확인','사용법 페이지의 다운로드 링크에서 직접 받은 FreeP2P인지 확인하세요.','모르는 사람이 보낸 파일은 주의'),
                 ('추가 정보 누르기','Windows의 PC 보호 창에서 추가 정보를 누릅니다. 앱 이름을 확인하세요.','FreeP2P.exe인지 확인'),

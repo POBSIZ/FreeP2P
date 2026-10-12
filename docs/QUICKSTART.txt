@@ -1,6 +1,8 @@
 FreeP2P — 친구와 Minecraft Java 함께하기
 
 두 사람 모두 FreeP2P를 실행하세요. Python은 설치하지 않아도 됩니다.
+짧아진 새 코드를 쓰려면 함께할 사람 모두 FreeP2P 0.3.0 이상으로 업데이트하세요.
+이전 버전 앱은 새 코드를 읽지 못합니다. 업데이트 후 코드를 새로 주고받으세요.
 Windows: 받은 파일을 모두 압축 풀기 → FreeP2P 폴더 → FreeP2P.exe
 Mac M 시리즈: 받은 압축 파일을 두 번 클릭 → FreeP2P 앱
 Windows의 _internal 폴더는 지우지 마세요.

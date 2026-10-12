@@ -9,7 +9,7 @@ rules = {
     'private-key': rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
     'github-token': rb'gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}',
     'aws-key': rb'AKIA[A-Z0-9]{16}',
-    'real-invite': rb'fpm?1:[A-Za-z0-9_-]{80,}',
+    'real-invite': rb'(?:fpm[12]|fp1):[A-Za-z0-9_-]{40,}',
     'local-control-token': rb'https?://(?:127\.0\.0\.1|localhost):\d+/#[-A-Za-z0-9_]{25,}',
     'personal-path': rb'(?:[A-Z]:[\\/]Users[\\/][^\s]+|/Users/[a-z][^/\s]+/)',
 }
